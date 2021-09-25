@@ -117,6 +117,13 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="btn_save">
+         <property name="text">
+          <string>保存</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>

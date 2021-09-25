@@ -51,6 +51,7 @@ class CMainWidget(QWidget, cUi):
             vbox.addLayout(hbox)
         self.frame.setLayout(vbox)
         self.btn_open.clicked.connect(self.slot_btn_open)
+        self.btn_save.clicked.connect(self.slot_btn_save)
         self.btn_to_coco.clicked.connect(self.slot_btn_to_coco)
         self.btn_to_voc.clicked.connect(self.slot_btn_to_voc)
         self.btn_back.clicked.connect(self.slot_btn_pre)
@@ -66,7 +67,6 @@ class CMainWidget(QWidget, cUi):
     def closeEvent(self, event):
         self.save_box_info()
         self.write_label_file()
-        pass
 
     def read_label_file(self):
         if os.path.exists(self.label_file):
@@ -174,6 +174,10 @@ class CMainWidget(QWidget, cUi):
     def slot_edit_change(self):
         for image_win in self.image_widgets:
             image_win.set_current_cls(int(self.edit_cls.text()))
+
+    def slot_btn_save(self):
+        self.save_box_info()
+        self.write_label_file()
 
     def update_batch_index(self, next=True, pre=False):
         if len(self.label_info.keys()) == 0:

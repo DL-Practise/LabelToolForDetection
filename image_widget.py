@@ -42,7 +42,11 @@ class CImageWidget(QWidget, cUi):
         self.current_box = [0,0,0,0,0]
         
         #显示信息
-        self.det_color = QColor(255, 0, 0)
+        self.det_color = [QColor(255, 0, 0),
+                          QColor(0, 255, 0),
+                          QColor(0, 255, 255),
+                          QColor(255, 0, 255),
+                          QColor(0, 255, 255)]
         self.det_width = 2
         self.line_color = QColor(255, 255, 0)
         self.line_width = 1
@@ -113,7 +117,7 @@ class CImageWidget(QWidget, cUi):
     def draw_det_info(self, painter):
         for rect in self.box_list:
             pen = QPen()
-            pen.setColor(self.det_color)
+            pen.setColor(self.det_color[int(rect[4]) % len(self.det_color)])
             pen.setWidth(self.det_width)
             painter.setPen(pen)
             painter.drawRect(rect[0] * self.width() / self.img.width(),
@@ -122,11 +126,11 @@ class CImageWidget(QWidget, cUi):
                              (rect[3]-rect[1]) * self.height() / self.img.height())
             painter.drawText(rect[0] * self.width() / self.img.width(),
                              rect[1] * self.height() / self.img.height(),
-                             str(rect[4]))
+                             str(int(rect[4])))
         if self.start_label:
             rect = self.current_box
             pen = QPen()
-            pen.setColor(self.det_color)
+            pen.setColor(self.det_color[int(rect[4]) % len(self.det_color)])
             pen.setWidth(self.det_width)
             painter.setPen(pen)
             painter.drawRect(rect[0] * self.width() / self.img.width(),
@@ -135,7 +139,7 @@ class CImageWidget(QWidget, cUi):
                              (rect[3] - rect[1]) * self.height() / self.img.height())
             painter.drawText(rect[0] * self.width() / self.img.width(),
                              rect[1] * self.height() / self.img.height(),
-                             str(rect[4]))
+                             str(int(rect[4])))
 
     def draw_line(self, painter):
         pen = QPen()
