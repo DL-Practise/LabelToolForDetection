@@ -10,9 +10,21 @@ from PyQt5.QtGui import *
 from image_widget import *
 import shutil
 import glob
+from to_coco import COCOCreater
+import multiprocessing
 
 # ui配置文件
 cUi, cBase = uic.loadUiType("main_widget.ui")
+
+def trans_data(src_dri, dst_dir, trans_type):
+    if trans_type == 'coco':
+        coco = COCOCreater(src_dri, dst_dir)
+        coco.read_ori_labels()
+        coco.create_train_map()
+        coco.create_val_map()
+    else:
+        print('unsupport type: ', trans_type)
+    
 
 # 主界面
 class CMainWidget(QWidget, cUi):
@@ -26,9 +38,9 @@ class CMainWidget(QWidget, cUi):
         self.label_info = {}
         self.image_widgets = []
         self.batch_index = 0
-        
         self.side = 2
         self.total = self.side*self.side
+        self.trans_process = None
 
         vbox = QVBoxLayout()
         for i in range(self.side):
@@ -39,6 +51,8 @@ class CMainWidget(QWidget, cUi):
             vbox.addLayout(hbox)
         self.frame.setLayout(vbox)
         self.btn_open.clicked.connect(self.slot_btn_open)
+        self.btn_to_coco.clicked.connect(self.slot_btn_to_coco)
+        self.btn_to_voc.clicked.connect(self.slot_btn_to_voc)
         self.btn_back.clicked.connect(self.slot_btn_pre)
         self.btn_next.clicked.connect(self.slot_btn_next)
         self.edit_cls.textChanged.connect(self.slot_edit_change)
@@ -97,7 +111,7 @@ class CMainWidget(QWidget, cUi):
                 self.label_info[name] = boxes
 
     def slot_btn_open(self):
-        self.image_dir = QFileDialog.getExistingDirectory(self, "选择文件夹", "C:\\Users\\newst\\Desktop\\test_data")
+        self.image_dir = QFileDialog.getExistingDirectory(self, u"选择标定图片文件夹", os.getcwd())
         if os.path.exists(self.image_dir):
             self.btn_back.show()
             self.btn_next.show()
@@ -136,6 +150,27 @@ class CMainWidget(QWidget, cUi):
                 else:
                     self.image_widgets[i].set_info(None, None)
 
+    def slot_btn_to_coco(self):
+        print('to coco')
+        if self.trans_process is not None and self.trans_process.is_alive():            
+            QMessageBox.critical(self, u"提示", u"正在转换数据集，请稍后", QMessageBox.Yes)
+            return
+            
+        save_dir = QFileDialog.getExistingDirectory(self, u"选择COCO保存文件夹", os.getcwd())
+        if os.path.exists(save_dir):
+            if os.listdir(save_dir):
+               ret = QMessageBox.critical(self, u"警告", u"所选文件夹(%s)非空，继续转换将会清空该文件夹"%save_dir, QMessageBox.Yes | QMessageBox.No)
+               if ret == QMessageBox.Yes:
+                   shutil.rmtree(save_dir)
+                   os.mkdir(save_dir)
+                   
+            self.trans_process = multiprocessing.Process(target=trans_data, args = (self.image_dir, save_dir, 'coco',))
+            self.trans_process.start()
+        
+    def slot_btn_to_voc(self):
+        print('to voc')
+        QMessageBox.critical(self, u"提示", u"VOC数据集转换正在开发中...", QMessageBox.Yes)
+
     def slot_edit_change(self):
         for image_win in self.image_widgets:
             image_win.set_current_cls(int(self.edit_cls.text()))
@@ -168,7 +203,7 @@ class CMainWidget(QWidget, cUi):
         self.label_jindu.setText('%d/%d'%(self.batch_index, self.total_batch))
         return image_names
 
-
+        
 
 if __name__ == "__main__":
     cApp = QApplication(sys.argv)

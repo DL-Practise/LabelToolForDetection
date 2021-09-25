@@ -63,14 +63,14 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnToCoco">
+        <widget class="QPushButton" name="btn_to_coco">
          <property name="text">
           <string>转换为COCO格式</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnToVoc">
+        <widget class="QPushButton" name="btn_to_voc">
          <property name="text">
           <string>转换为VOC格式</string>
          </property>
