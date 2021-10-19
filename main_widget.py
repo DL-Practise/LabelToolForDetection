@@ -12,22 +12,32 @@ import shutil
 import glob
 from to_coco import COCOCreater
 import multiprocessing
+import time
+import threading
 
 # ui配置文件
 cUi, cBase = uic.loadUiType("main_widget.ui")
 
-def trans_data(src_dri, dst_dir, trans_type):
+
+def trans_data(main_widget, src_dri, dst_dir, trans_type):
     if trans_type == 'coco':
         coco = COCOCreater(src_dri, dst_dir)
         coco.read_ori_labels()
+        main_widget.trans_signal.emit(10)
         coco.create_train_map()
+        main_widget.trans_signal.emit(80)
         coco.create_val_map()
+        main_widget.trans_signal.emit(100)
     else:
         print('unsupport type: ', trans_type)
     
 
 # 主界面
 class CMainWidget(QWidget, cUi):
+    
+    # pyqtSignal should be class method
+    trans_signal = pyqtSignal(int)
+    
     def __init__(self):
         # 设置UI
         QMainWindow.__init__(self)
@@ -41,6 +51,9 @@ class CMainWidget(QWidget, cUi):
         self.side = 2
         self.total = self.side*self.side
         self.trans_process = None
+        self.trans_value = 0
+        self.trans_dialog = None
+        self.trans_signal.connect(self.trans_slot)
 
         vbox = QVBoxLayout()
         for i in range(self.side):
@@ -63,11 +76,19 @@ class CMainWidget(QWidget, cUi):
 
         self.setWindowIcon(QIcon("logo.png"))
         self.setWindowTitle("label tool for detection")
-
+        
+        
     def closeEvent(self, event):
         self.save_box_info()
         self.write_label_file()
 
+    def trans_slot(self, trans_vlue):
+        print('get signale: ', trans_vlue)
+        self.trans_dialog.setValue(trans_vlue)
+        if trans_vlue == 100:
+            QMessageBox.information(self, u"提示", u"转换结束", QMessageBox.Yes)
+            
+        
     def read_label_file(self):
         if os.path.exists(self.label_file):
             with open(self.label_file, 'r') as f:
@@ -152,6 +173,7 @@ class CMainWidget(QWidget, cUi):
 
     def slot_btn_to_coco(self):
         print('to coco')
+        self.slot_btn_save()
         if self.trans_process is not None and self.trans_process.is_alive():            
             QMessageBox.critical(self, u"提示", u"正在转换数据集，请稍后", QMessageBox.Yes)
             return
@@ -159,16 +181,29 @@ class CMainWidget(QWidget, cUi):
         save_dir = QFileDialog.getExistingDirectory(self, u"选择COCO保存文件夹", os.getcwd())
         if os.path.exists(save_dir):
             if os.listdir(save_dir):
-               ret = QMessageBox.critical(self, u"警告", u"所选文件夹(%s)非空，继续转换将会清空该文件夹"%save_dir, QMessageBox.Yes | QMessageBox.No)
-               if ret == QMessageBox.Yes:
-                   shutil.rmtree(save_dir)
-                   os.mkdir(save_dir)
+                ret = QMessageBox.critical(self, u"警告", u"所选文件夹(%s)非空，继续转换将会清空该文件夹"%save_dir, QMessageBox.Yes | QMessageBox.No)
+                if ret == QMessageBox.Yes:
+                    shutil.rmtree(save_dir)
+                    os.mkdir(save_dir)
+                else:
+                    return
                    
-            self.trans_process = multiprocessing.Process(target=trans_data, args = (self.image_dir, save_dir, 'coco',))
+            #self.trans_process = multiprocessing.Process(target=trans_data, args = (self.image_dir, save_dir, 'coco',))
+            self.trans_process = threading.Thread(target=trans_data, args = (self, self.image_dir, save_dir, 'coco',))
             self.trans_process.start()
+            
+            self.trans_dialog = QProgressDialog(self)
+            self.trans_dialog.setWindowTitle("转换中")  
+            self.trans_dialog.setLabelText("正在转换，请勿关闭...")
+            self.trans_dialog.setMinimumDuration(1)
+            self.trans_dialog.setWindowModality(Qt.WindowModal)
+            self.trans_dialog.setRange(1,100) 
+            self.trans_dialog.setValue(1)
+            self.trans_dialog.show()
         
     def slot_btn_to_voc(self):
         print('to voc')
+        self.slot_btn_save()
         QMessageBox.critical(self, u"提示", u"VOC数据集转换正在开发中...", QMessageBox.Yes)
 
     def slot_edit_change(self):
@@ -179,6 +214,7 @@ class CMainWidget(QWidget, cUi):
         self.save_box_info()
         self.write_label_file()
 
+        
     def update_batch_index(self, next=True, pre=False):
         if len(self.label_info.keys()) == 0:
             return None
