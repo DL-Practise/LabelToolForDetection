@@ -1,4 +1,4 @@
-﻿'''
+'''
 coco instance file example:
 {
     "info": { 
