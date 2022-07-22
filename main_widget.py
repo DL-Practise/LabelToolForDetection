@@ -11,6 +11,7 @@ from image_widget import *
 import shutil
 import glob
 from to_coco import COCOCreater
+from to_yolov6_v2 import YoloV6Creater 
 import multiprocessing
 import time
 import threading
@@ -27,6 +28,12 @@ def trans_data(main_widget, src_dri, dst_dir, trans_type):
         coco.create_train_map()
         main_widget.trans_signal.emit(80)
         coco.create_val_map()
+        main_widget.trans_signal.emit(100)
+    elif trans_type == 'yolov6':
+        yolov6_trans = YoloV6Creater(src_dri, dst_dir)
+        yolov6_trans.read_ori_labels()
+        main_widget.trans_signal.emit(10)
+        yolov6_trans.create()
         main_widget.trans_signal.emit(100)
     else:
         print('unsupport type: ', trans_type)
@@ -67,10 +74,12 @@ class CMainWidget(QWidget, cUi):
         self.btn_save.clicked.connect(self.slot_btn_save)
         self.btn_to_coco.clicked.connect(self.slot_btn_to_coco)
         self.btn_to_voc.clicked.connect(self.slot_btn_to_voc)
+        self.btn_to_yolov6.clicked.connect(self.slot_btn_to_yolov6)
         self.btn_back.clicked.connect(self.slot_btn_pre)
         self.btn_next.clicked.connect(self.slot_btn_next)
         self.edit_cls.textChanged.connect(self.slot_edit_change)
-
+        
+        
         self.btn_back.hide()
         self.btn_next.hide()
 
@@ -188,7 +197,6 @@ class CMainWidget(QWidget, cUi):
                 else:
                     return
                    
-            #self.trans_process = multiprocessing.Process(target=trans_data, args = (self.image_dir, save_dir, 'coco',))
             self.trans_process = threading.Thread(target=trans_data, args = (self, self.image_dir, save_dir, 'coco',))
             self.trans_process.start()
             
@@ -200,7 +208,36 @@ class CMainWidget(QWidget, cUi):
             self.trans_dialog.setRange(1,100) 
             self.trans_dialog.setValue(1)
             self.trans_dialog.show()
-        
+            
+    def slot_btn_to_yolov6(self):
+        print('to yolov6')
+        self.slot_btn_save()
+        if self.trans_process is not None and self.trans_process.is_alive():            
+            QMessageBox.critical(self, u"提示", u"正在转换数据集，请稍后", QMessageBox.Yes)
+            return
+            
+        save_dir = QFileDialog.getExistingDirectory(self, u"选择YoloV6格式数据保存文件夹", os.getcwd())
+        if os.path.exists(save_dir):
+            if os.listdir(save_dir):
+                ret = QMessageBox.critical(self, u"警告", u"所选文件夹(%s)非空，继续转换将会清空该文件夹"%save_dir, QMessageBox.Yes | QMessageBox.No)
+                if ret == QMessageBox.Yes:
+                    shutil.rmtree(save_dir)
+                    os.mkdir(save_dir)
+                else:
+                    return
+                   
+            self.trans_process = threading.Thread(target=trans_data, args = (self, self.image_dir, save_dir, 'yolov6',))
+            self.trans_process.start()
+            
+            self.trans_dialog = QProgressDialog(self)
+            self.trans_dialog.setWindowTitle("转换中")  
+            self.trans_dialog.setLabelText("正在转换，请勿关闭...")
+            self.trans_dialog.setMinimumDuration(1)
+            self.trans_dialog.setWindowModality(Qt.WindowModal)
+            self.trans_dialog.setRange(1,100) 
+            self.trans_dialog.setValue(1)
+            self.trans_dialog.show()
+            
     def slot_btn_to_voc(self):
         print('to voc')
         self.slot_btn_save()

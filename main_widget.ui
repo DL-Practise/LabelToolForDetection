@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>833</width>
+    <width>968</width>
     <height>651</height>
    </rect>
   </property>
@@ -73,6 +73,13 @@
         <widget class="QPushButton" name="btn_to_voc">
          <property name="text">
           <string>转换为VOC格式</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_to_yolov6">
+         <property name="text">
+          <string>转换为YoloV6格式</string>
          </property>
         </widget>
        </item>

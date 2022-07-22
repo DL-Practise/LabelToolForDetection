@@ -79,6 +79,7 @@ import json
 import cv2
 import random
 import shutil
+from pathlib import Path
 
 class COCOCreater:
 
@@ -145,52 +146,61 @@ class COCOCreater:
             ]
         }
         
-        self.support_formats=['jpg', 'JPG', 'png', 'PNG']
+        self.support_formats=['jpg', 'JPG', 'png', 'PNG', 'bmp', 'BMP', 'jpeg', 'JPEG']
         self.src_dir = src_dir
         self.dst_dir = dst_dir
         self.src_label_file = self.src_dir + '/label.txt'
         self._create_dst_struct()
         
-    def read_ori_labels(self):
+    def read_ori_labels(self, shuffle=True, train_ratio=0.8):
         print("trans to coco: start read ori labels")
         labels = []
         with open(self.src_label_file, 'r') as f:
             for line in f.readlines():
                 labels.append(line.strip('\r\n'))
-        random.shuffle(labels)        
-        self.ori_train_labels = labels[0: int(len(labels) * 0.8)]
-        self.ori_val_labels = labels[int(len(labels) * 0.8):]
-        #print(self.ori_train_labels)
-        #print(self.ori_val_labels)
+        if shuffle:
+            random.shuffle(labels)
         
+        train_count = int(len(labels) * train_ratio)
+        val_count = len(labels) - train_count
+        if train_count == 0:
+            self.ori_train_labels = []
+            self.ori_val_labels = labels
+        elif val_count == 0:
+            self.ori_train_labels = labels
+            self.ori_val_labels = []
+        else:
+            self.ori_train_labels = labels[0: train_count]
+            self.ori_val_labels = labels[train_count:]
+        return self.ori_train_labels, self.ori_val_labels
     
-    def create_train_map(self):
+    def create_train_map(self, rename_img=False):
         print("trans to coco: start create train dataset for coco")
-        self._create_coco_map(self.ori_train_labels, self.train_map, self.dst_dir_train2017)
+        if len(self.ori_train_labels) == 0:
+            print("trans to coco: train count is 0, ignore")
+        self._create_coco_map(self.ori_train_labels, self.train_map, self.dst_dir_train2017, rename_img)
         with open(self.instances_train2017, "w") as f:
             json.dump(self.train_map, f)
         
-        
-    def create_val_map(self):
+    def create_val_map(self, rename_img=False):
         print("trans to coco: start create val data set for coco")
-        self._create_coco_map(self.ori_val_labels, self.val_map, self.dst_dir_val2017)
+        if len(self.ori_val_labels) == 0:
+            print("trans to coco: val count is 0, ignore")
+        self._create_coco_map(self.ori_val_labels, self.val_map, self.dst_dir_val2017, rename_img)
         with open(self.instances_val2017, "w") as f:
             json.dump(self.val_map, f)
     
-    def _create_coco_map(self, ori_labels, coco_map, img_dst_dir):
-        self.max_cls = -1
-        self.img_id = 0
+    def _create_coco_map(self, ori_labels, coco_map, img_dst_dir, rename_img=False):
+        self.all_cls = []
         self.box_id = 0
+        self.img_id = 0
      
         for i, line in enumerate(ori_labels):
             print('trans to coco: %d/%d'%(i+1, len(ori_labels)))
-            self._create_by_line(line.strip('\r\n'), coco_map, img_dst_dir)
+            self._create_by_line(line.strip('\r\n'), coco_map, img_dst_dir, rename_img)
         print('trans to coco: success')
-        #print(self.train_map)
-        #print(json.dumps(self.train_map))
         
-        
-    def _create_by_line(self, line, coco_map, img_dst_dir):
+    def _create_by_line(self, line, coco_map, img_dst_dir, rename_img=False):
         fileds = line.split(' ')
         img_name=fileds[0]
         assert '.' in img_name, 'img_name do not has . '
@@ -200,8 +210,13 @@ class COCOCreater:
         img = cv2.imread(img_path)
         assert img is not None, 'img is none, img path is:%s'%img_path
         h, w, c = img.shape
-        shutil.copy(img_path, img_dst_dir)
-                
+        if rename_img:
+            img_name = "%d%s"%(self.img_id, Path(img_name).suffix)
+            img_dst_path = os.path.join(img_dst_dir, img_name)
+        else:
+            img_dst_path = img_dst_dir
+        shutil.copy(img_path, img_dst_path)
+        
         #add image
         self._add_image(img_name, h, w, coco_map)
         
@@ -220,17 +235,15 @@ class COCOCreater:
                 self._add_cls(cls, coco_map)
                 self._add_box(x0,y0,x1,y1,cls, coco_map)
                 self.box_id += 1
-                
-        self.img_id += 1  
-        
-        
-    
+        self.img_id += 1
+
     def _add_cls(self, cls, coco_map):
-        if cls > self.max_cls:
-            self.max_cls = cls
+        if cls not in self.all_cls:
+            self.all_cls.append(cls)
             coco_map["categories"].append({"supercategory": "type_%d"%cls, 
-                                                 "id": self.max_cls,
+                                                 "id": cls,
                                                  "name": "type_%d"%cls})
+    
     def _add_image(self, img_name, h, w, coco_map):
         coco_map["images"].append({"license": 1,
                                          "file_name": "%s"%img_name,
@@ -253,7 +266,6 @@ class COCOCreater:
                                              "id": self.box_id
                                              })
         
-        
     def _create_dst_struct(self):
         assert(os.path.exists(self.dst_dir))
         self.dst_dir_train2017 = os.path.join(self.dst_dir, 'train2017')
@@ -272,8 +284,8 @@ class COCOCreater:
         
         
 if __name__ == '__main__':
-    coco = COCOCreater('./third_bridge_0', '../ttt')
-    coco.read_ori_labels()
+    coco = COCOCreater('../gongchengche-std', '../gongchengche-yolov6')
+    coco.read_ori_labels(shuffle=True, train_ratio=0.8)
     coco.create_train_map()
     coco.create_val_map()
 
